@@ -1,0 +1,4 @@
+pyrofork==2.3.43
+tgcrypto-pyrofork
+pymongo
+python-dotenv
