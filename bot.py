@@ -12,11 +12,16 @@ app.start()
 loop = app.loop
 
 bot_cmds = [
-    BotCommand("set_msg", "Set Message To Send On Join (Admins)"),
-    BotCommand("get_msg", "Get Current Join Message (Admins)"),
-    BotCommand("total_users", "Get Total Users (Admins)"),
-    BotCommand("broadcast", "Broadcast To All Users (Owner Only)"),
+    BotCommand("set_msg", "Set Message To Send On Join (Admins Only)"),
+    BotCommand("get_msg", "Get Current Join Message (Admins Only)"),
+    BotCommand("total_users", "Get Total Users (Admins Only)"),
+    BotCommand("broadcast", "Broadcast To All Users (Admins Only)"),
 ]
+
+async def set_commands():
+    await app.set_bot_commands(bot_cmds)
+
+loop.run_until_complete(set_commands())
 
 @app.on_chat_join_request()
 async def on_chat_join(client , message):
