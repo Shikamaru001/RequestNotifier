@@ -1,0 +1,22 @@
+name: Deploy
+
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Heroku CLI
+        run: |
+          curl https://cli-assets.heroku.com/install.sh | sh 
+      - uses: akhileshns/heroku-deploy@v3.14.15
+        with:
+          heroku_api_key: xxxx
+          heroku_app_name: xxxx
+          heroku_email: xxxx
+          team: xxxx
+          usedocker: true
+          docker_heroku_process_type: web
+          stack: "container"
+          region: "eu"
