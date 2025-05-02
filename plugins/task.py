@@ -7,15 +7,15 @@ from pyrogram.helpers import ikb , bki
 
 async def send_msg(client , chat_id):
 
-    msg = config_dict[client.me.id]['MSG']
-    photo = config_dict[client.me.id]['PHOTO']
-    button = config_dict[client.me.id]['BUTTON']
+    msg = config_dict[str(client.me.id)]['MSG']
+    photo = config_dict[str(client.me.id)]['PHOTO']
+    button = config_dict[str(client.me.id)]['BUTTON']
 
     if not msg: return False
 
     reply_markup = None if not button else ikb(button)
 
-    if not PHOTO:
+    if not photo:
         await client.send_message(chat_id , msg , reply_markup=reply_markup)
     else:
         await client.send_photo(chat_id , photo , caption=msg , reply_markup=reply_markup)
@@ -23,6 +23,8 @@ async def send_msg(client , chat_id):
 
 @Client.on_chat_join_request()
 async def on_chat_join(client , message):
+
+    my_id = str(client.me.id)
     
     from_user = message.from_user
 
@@ -37,7 +39,7 @@ async def on_chat_join(client , message):
 @Client.on_message(filters.command('set_msg'))
 async def set_msg(client , message):
 
-    my_id = client.me.id
+    my_id = str(client.me.id)
 
     if message.from_user.id not in config_dict[my_id]['ADMINS'] + OWNER:
         message.continue_propagation()
@@ -64,7 +66,7 @@ async def set_msg(client , message):
 @Client.on_message(filters.command('get_msg'))
 async def get_msg(client , message):
 
-    my_id = client.me.id
+    my_id = str(client.me.id)
 
     if message.from_user.id not in config_dict[my_id]['ADMINS'] + OWNER:
         message.continue_propagation()
@@ -80,7 +82,7 @@ async def get_msg(client , message):
 @Client.on_message(filters.command('total_users'))
 async def total_users(client , message):
 
-    my_id = client.me.id
+    my_id = str(client.me.id)
 
     if message.from_user.id not in config_dict[my_id]['ADMINS'] + OWNER:
         message.continue_propagation()
@@ -95,7 +97,7 @@ async def total_users(client , message):
 @Client.on_message(filters.command('addadmin') & filters.private & filters.user(OWNER))
 async def add_admin(client , message):
 
-    my_id = client.me.id
+    my_id = str(client.me.id)
 
     try:
         user_id = int(message.text.split()[1])
@@ -114,7 +116,7 @@ async def add_admin(client , message):
 @Client.on_message(filters.command('removeadmin') & filters.private & filters.user(OWNER))
 async def remove_admin(client , message):
 
-    my_id = client.me.id
+    my_id = str(client.me.id)
 
     try:
         user_id = int(message.text.split()[1])
@@ -132,7 +134,7 @@ async def remove_admin(client , message):
 
 @Client.on_message(filters.command('listadmins') & filters.private & filters.user(OWNER))
 async def list_admins(client , message):
-    my_id = client.me.id
+    my_id = str(client.me.id)
 
     admins = config_dict[my_id]['ADMINS']
 
@@ -158,7 +160,7 @@ async def convertTime(s: int) -> str:
 @Client.on_message(filters.private & filters.command('broadcast'))
 async def on_broadcast(client , message):
 
-    my_id = client.me.id
+    my_id = str(client.me.id)
 
     if message.from_user.id not in config_dict[my_id]['ADMINS'] + OWNER:
         message.continue_propagation()
@@ -250,6 +252,8 @@ async def on_broadcast(client , message):
 
 @Client.on_message(filters.private)
 async def on_other_messages(client , message):
+
+    my_id = str(client.me.id)
 
     if not message.from_user: return
 
