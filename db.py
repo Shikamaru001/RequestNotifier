@@ -12,9 +12,6 @@ if not config_dict:
     config_dict = {'_id' : MONGODB_DB}
     col.insert_one(config_dict)
 
-if 'USERS' not in config_dict: config_dict['USERS'] = []
-if 'MSG' not in config_dict: config_dict['MSG'] = None
-
 lock = asyncio.Lock()
 
 async def sync():

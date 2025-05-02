@@ -13,7 +13,7 @@ BOT_TOKEN = environ.get("BOT_TOKEN", "")
 MONGODB_URI = environ.get("MONGODB_URI", "")
 MONGODB_DB = environ.get("MONGODB_DB", "")
 
-ADMINS = [ int(x) for x in (environ.get("ADMINS", "") or "").split() ]
+OWNER = [int(x) for x in environ.get("OWNER", "").split()]
 
 #LOGGING
 logging.basicConfig(
