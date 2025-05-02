@@ -72,6 +72,8 @@ async def add_bot(client, message):
     config_dict[bot_id] = {
         'BOT_TOKEN': bot_token,
         'MSG': None,
+        'PHOTO' : None ,
+        'BUTTON' : None ,
         'ADMINS': [],
         'USERS': []
     }

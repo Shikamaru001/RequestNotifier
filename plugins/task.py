@@ -3,16 +3,26 @@ from db import config_dict, sync
 from config import OWNER
 from pyrogram.errors import FloodWait, UserIsBlocked, InputUserDeactivated
 import time , asyncio
+from pyrogram.helpers import ikb , bki
+
+async def send_msg(client , chat_id):
+
+    msg = config_dict[client.me.id]['MSG']
+    photo = config_dict[client.me.id]['PHOTO']
+    button = config_dict[client.me.id]['BUTTON']
+
+    if not msg: return False
+
+    reply_markup = None if not button else ikb(button)
+
+    if not PHOTO:
+        await client.send_message(chat_id , msg , reply_markup=reply_markup)
+    else:
+        await client.send_photo(chat_id , photo , caption=msg , reply_markup=reply_markup)
+    return True
 
 @Client.on_chat_join_request()
 async def on_chat_join(client , message):
-
-    my_id = client.me.id
-
-    msg = config_dict[my_id]['MSG']
-
-    if not msg:
-        return 
     
     from_user = message.from_user
 
@@ -22,7 +32,7 @@ async def on_chat_join(client , message):
         config_dict[my_id]['USERS'].append(from_user.id)
         await sync()
 
-    await client.send_message(from_user.id , msg)
+    await send_msg(client , from_user.id)
 
 @Client.on_message(filters.command('set_msg'))
 async def set_msg(client , message):
@@ -34,16 +44,20 @@ async def set_msg(client , message):
 
     reply = message.reply_to_message
 
-    if not (reply and reply.text):
-        return await message.reply_text("<b>Reply To Any Text Message To Set As Join Message !</b>")
+    if not (reply and (reply.text or reply.photo)):
+        return await message.reply_text("<b>Reply To Any Text Or Photo Message To Set As Join Message !</b>")
     
-    html_msg = reply.text.html
+    html_msg = (reply.text or reply.caption).html
 
     config_dict[my_id]['MSG'] = html_msg
 
-    await message.reply_text(f'''<b>Join Message Set Successfully -
+    if reply.photo:
+        config_dict[my_id]['PHOTO'] = reply.photo.file_id
     
-<code>{html_msg}</code></b>''')
+    if reply.reply_markup:
+        config_dict[my_id]['BUTTON'] = bki(reply.reply_markup)
+
+    await message.reply_text(f'''<b>Join Message Set Successfully !</b>''')
 
     await sync()
 
@@ -60,9 +74,8 @@ async def get_msg(client , message):
     if not msg:
         return await message.reply_text("<b>No Join Message Set !</b>")
     
-    await message.reply_text(f'''<b>Current Join Message -
-
-<code>{msg}</code></b>''')
+    await message.reply_text(f"<b>Below Is The Current Message -</b>")
+    await send_msg(client , message.from_user.id)
 
 @Client.on_message(filters.command('total_users'))
 async def total_users(client , message):
@@ -78,6 +91,57 @@ async def total_users(client , message):
         return await message.reply_text("<b>No Users Found !</b>")
     
     await message.reply_text(f"<b>Total Users - {len(total)}</b>")
+
+@Client.on_message(filters.command('addadmin') & filters.private & filters.user(OWNER))
+async def add_admin(client , message):
+
+    my_id = client.me.id
+
+    try:
+        user_id = int(message.text.split()[1])
+    except IndexError:
+        return await message.reply_text("<b>Provide User ID To Add As Admin !</b>")
+    
+    if user_id in config_dict[my_id]['ADMINS']:
+        return await message.reply_text("<b>This User Is Already An Admin !</b>")
+    
+    config_dict[my_id]['ADMINS'].append(user_id)
+
+    await sync()
+
+    await message.reply_text(f"<b>User ID {user_id} Added As Admin !</b>")
+
+@Client.on_message(filters.command('removeadmin') & filters.private & filters.user(OWNER))
+async def remove_admin(client , message):
+
+    my_id = client.me.id
+
+    try:
+        user_id = int(message.text.split()[1])
+    except IndexError:
+        return await message.reply_text("<b>Provide User ID To Remove From Admins !</b>")
+    
+    if user_id not in config_dict[my_id]['ADMINS']:
+        return await message.reply_text("<b>This User Is Not An Admin !</b>")
+    
+    config_dict[my_id]['ADMINS'].remove(user_id)
+
+    await sync()
+
+    await message.reply_text(f"<b>User ID {user_id} Removed From Admins !</b>")
+
+@Client.on_message(filters.command('listadmins') & filters.private & filters.user(OWNER))
+async def list_admins(client , message):
+    my_id = client.me.id
+
+    admins = config_dict[my_id]['ADMINS']
+
+    if not admins:
+        return await message.reply_text("<b>No Admins Found !</b>")
+    
+    admin_list = "\n".join([f"<code>{admin}</code>" for admin in admins])
+
+    await message.reply_text(f"<b>Admins -\n{admin_list}</b>")
 
 async def convertTime(s: int) -> str:
     m, s = divmod(int(s), 60)
@@ -187,17 +251,10 @@ async def on_broadcast(client , message):
 @Client.on_message(filters.private)
 async def on_other_messages(client , message):
 
-    my_id = client.me.id
-
     if not message.from_user: return
 
     if message.from_user.id not in config_dict[my_id]['USERS']:
         config_dict[my_id]['USERS'].append(message.from_user.id)
         await sync()
-
-    msg = config_dict[my_id]['MSG']
-
-    if not msg:
-        return
     
-    await message.reply_text(msg)
+    await send_msg(client , message.from_user.id)
