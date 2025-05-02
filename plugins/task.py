@@ -1,46 +1,36 @@
-from pyrogram import Client, filters , idle
+from pyrogram import Client, filters
+from db import config_dict, sync
+from config import OWNER
 from pyrogram.errors import FloodWait, UserIsBlocked, InputUserDeactivated
-from config import API_ID, API_HASH, BOT_TOKEN , ADMINS , LOGGER
-from db import config_dict, sync , add_user , delete_user
 import time , asyncio
-from pyrogram.types import BotCommand
 
-app = Client('bot' , api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN , workers = 10)
-
-app.start()
-
-loop = app.loop
-
-bot_cmds = [
-    BotCommand("set_msg", "Set Message To Send On Join (Admins Only)"),
-    BotCommand("get_msg", "Get Current Join Message (Admins Only)"),
-    BotCommand("total_users", "Get Total Users (Admins Only)"),
-    BotCommand("broadcast", "Broadcast To All Users (Admins Only)"),
-]
-
-async def set_commands():
-    await app.set_bot_commands(bot_cmds)
-
-loop.run_until_complete(set_commands())
-
-@app.on_chat_join_request()
+@Client.on_chat_join_request()
 async def on_chat_join(client , message):
 
-    msg = config_dict['MSG']
+    my_id = client.me.id
+
+    msg = config_dict[my_id]['MSG']
 
     if not msg:
-        return
+        return 
     
     from_user = message.from_user
 
     if not from_user: return
 
-    await add_user(from_user.id)
+    if from_user.id not in config_dict[my_id]['USERS']:
+        config_dict[my_id]['USERS'].append(from_user.id)
+        await sync()
 
     await client.send_message(from_user.id , msg)
 
-@app.on_message(filters.command('set_msg') & filters.user(ADMINS))
+@Client.on_message(filters.command('set_msg'))
 async def set_msg(client , message):
+
+    my_id = client.me.id
+
+    if message.from_user.id not in config_dict[my_id]['ADMINS'] + OWNER:
+        message.continue_propagation()
 
     reply = message.reply_to_message
 
@@ -49,7 +39,7 @@ async def set_msg(client , message):
     
     html_msg = reply.text.html
 
-    config_dict['MSG'] = html_msg
+    config_dict[my_id]['MSG'] = html_msg
 
     await message.reply_text(f'''<b>Join Message Set Successfully -
     
@@ -57,10 +47,15 @@ async def set_msg(client , message):
 
     await sync()
 
-@app.on_message(filters.command('get_msg') & filters.user(ADMINS))
+@Client.on_message(filters.command('get_msg'))
 async def get_msg(client , message):
 
-    msg = config_dict['MSG']
+    my_id = client.me.id
+
+    if message.from_user.id not in config_dict[my_id]['ADMINS'] + OWNER:
+        message.continue_propagation()
+
+    msg = config_dict[my_id]['MSG']
 
     if not msg:
         return await message.reply_text("<b>No Join Message Set !</b>")
@@ -69,10 +64,15 @@ async def get_msg(client , message):
 
 <code>{msg}</code></b>''')
 
-@app.on_message(filters.command('total_users') & filters.user(ADMINS))
+@Client.on_message(filters.command('total_users'))
 async def total_users(client , message):
 
-    total = config_dict['USERS']
+    my_id = client.me.id
+
+    if message.from_user.id not in config_dict[my_id]['ADMINS'] + OWNER:
+        message.continue_propagation()
+
+    total = config_dict[my_id]['USERS']
 
     if not total:
         return await message.reply_text("<b>No Users Found !</b>")
@@ -91,15 +91,20 @@ async def convertTime(s: int) -> str:
     )
     return convertedTime[:-2]
 
-@app.on_message(filters.private & filters.command('broadcast') & filters.user(ADMINS))
+@Client.on_message(filters.private & filters.command('broadcast'))
 async def on_broadcast(client , message):
+
+    my_id = client.me.id
+
+    if message.from_user.id not in config_dict[my_id]['ADMINS'] + OWNER:
+        message.continue_propagation()
 
     reply = message.reply_to_message
 
     if not reply:
          return await message.reply_text("<b>Reply To Any Message To Broadcast !</b>" , quote=True)
 
-    query = config_dict['USERS']
+    query = config_dict[my_id]['USERS']
 
     broadcast_msg = reply
 
@@ -133,11 +138,15 @@ async def on_broadcast(client , message):
             successful += 1
         
         except UserIsBlocked:
-            await delete_user(user_id)
+            if user_id in config_dict[my_id]['USERS']:
+                config_dict[my_id]['USERS'].remove(user_id)
+                await sync()
             blocked += 1
         
         except InputUserDeactivated:
-            await delete_user(user_id)
+            if user_id in config_dict[my_id]['USERS']:
+                config_dict[my_id]['USERS'].remove(user_id)
+                await sync()
             deleted += 1
         
         except Exception as e:
@@ -175,19 +184,20 @@ async def on_broadcast(client , message):
     )
     await prog.edit(status)
 
-@app.on_message(filters.private)
+@Client.on_message(filters.private)
 async def on_other_messages(client , message):
+
+    my_id = client.me.id
 
     if not message.from_user: return
 
-    await add_user(message.from_user.id)
+    if message.from_user.id not in config_dict[my_id]['USERS']:
+        config_dict[my_id]['USERS'].append(message.from_user.id)
+        await sync()
 
-    msg = config_dict['MSG']
+    msg = config_dict[my_id]['MSG']
 
     if not msg:
         return
     
     await message.reply_text(msg)
-
-LOGGER(__name__).info("Bot Started Successfully !")
-idle()
