@@ -55,9 +55,13 @@ async def set_msg(client , message):
 
     if reply.photo:
         config_dict[my_id]['PHOTO'] = reply.photo.file_id
+    else:
+        config_dict[my_id]['PHOTO'] = None
     
     if reply.reply_markup:
         config_dict[my_id]['BUTTON'] = bki(reply.reply_markup)
+    else:
+        config_dict[my_id]['BUTTON'] = None
 
     await message.reply_text(f'''<b>Join Message Set Successfully !</b>''')
 
