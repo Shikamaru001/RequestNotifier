@@ -13,7 +13,7 @@ jobs:
       - uses: akhileshns/heroku-deploy@v3.14.15
         with:
           heroku_api_key: HRKU-11738323-9a35-4c76-a909-7bebb646b7e1
-          heroku_app_name: aaaom
+          heroku_app_name: aaaomm
           heroku_email: vikramsingh547836@gmail.com
           team: king6565
           usedocker: true
