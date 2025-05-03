@@ -207,10 +207,10 @@ async def add_admin(client , message):
         user_id = int(message.text.split()[1])
     except IndexError:
         try:
-            return await message.reply_text("<b>Provide User ID To Add As Admin !</b>")
+            return await message.reply_text("<b>Provide User ID To Add As Admin With Command !</b>")
         except FloodWait as e:
             await asyncio.sleep(e.value * 1.2)
-            return await message.reply_text("<b>Provide User ID To Add As Admin !</b>")
+            return await message.reply_text("<b>Provide User ID To Add As Admin With Command !</b>")
     
     if user_id in config_dict[my_id]['ADMINS']:
         try:
@@ -238,10 +238,10 @@ async def remove_admin(client , message):
         user_id = int(message.text.split()[1])
     except IndexError:
         try:
-            return await message.reply_text("<b>Provide User ID To Remove From Admins !</b>")
+            return await message.reply_text("<b>Provide User ID To Remove From Admins With Command !</b>")
         except FloodWait as e:
             await asyncio.sleep(e.value * 1.2)
-            return await message.reply_text("<b>Provide User ID To Remove From Admins !</b>")
+            return await message.reply_text("<b>Provide User ID To Remove From Admins With Command !</b>")
     
     if user_id not in config_dict[my_id]['ADMINS']:
         try:
@@ -294,7 +294,7 @@ async def auto_delete(client , message):
     except IndexError:
         current_auto_delete = config_dict[my_id]['AUTO_DELETE']
         if not current_auto_delete:
-            text = "<b>Provide Time In Seconds To Set Auto Delete !</b>"
+            text = "<b>Provide Time In Seconds To Set Auto Delete With Command !</b>"
         else:
             text = f"<b>Auto Delete Time Is Currently Set To {current_auto_delete} Seconds !</b>"
         try:
