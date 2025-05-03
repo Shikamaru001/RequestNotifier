@@ -5,20 +5,41 @@ from pyrogram.errors import FloodWait, UserIsBlocked, InputUserDeactivated
 import time , asyncio
 from pyrogram.helpers import ikb , bki
 
+async def delete_task(messages , time):
+    
+    await asyncio.sleep(time)
+
+    for message in messages:
+        try:
+            await message.delete()
+        except FloodWait as e:
+            await asyncio.sleep(e.value * 1.2)
+            await message.delete()
+        except Exception as e:
+            pass
+
 async def send_msg(client , chat_id):
 
     msg = config_dict[str(client.me.id)]['MSG']
     photo = config_dict[str(client.me.id)]['PHOTO']
     button = config_dict[str(client.me.id)]['BUTTON']
+    auto_delete = config_dict[str(client.me.id)]['AUTO_DELETE']
+    protect = config_dict[str(client.me.id)]['PROTECT_CONTENT']
 
     if not msg: return False
 
     reply_markup = None if not button else ikb(button)
 
-    if not photo:
-        await client.send_message(chat_id , msg , reply_markup=reply_markup)
-    else:
-        await client.send_photo(chat_id , photo , caption=msg , reply_markup=reply_markup)
+    try:
+        if not photo:
+            done = await client.send_message(chat_id , msg , reply_markup=reply_markup , protect_content = protect)
+        else:
+            done = await client.send_photo(chat_id , photo , caption=msg , reply_markup=reply_markup , protect_content = protect)
+        if auto_delete:
+            asyncio.create_task(delete_task([done] , auto_delete))
+    except FloodWait as e:
+        await asyncio.sleep(e.value * 1.2)
+        return await send_msg(client , chat_id)
     return True
 
 @Client.on_chat_join_request()
@@ -28,10 +49,24 @@ async def on_chat_join(client , message):
     
     from_user = message.from_user
 
+    link = config_dict[my_id]['REQUEST_LINK'].get(str(message.chat.id))
+
+    if not link:
+        return
+    
+    if link != message.invite_link.invite_link: return
+    
+    if str(message.chat.id) not in config_dict[my_id]['REQUEST_COUNT']:
+        config_dict[my_id]['REQUEST_COUNT'][str(message.chat.id)] = []
+
     if not from_user: return
 
     if from_user.id not in config_dict[my_id]['USERS']:
         config_dict[my_id]['USERS'].append(from_user.id)
+        await sync()
+    
+    if from_user.id not in config_dict[my_id]['REQUEST_COUNT'][str(message.chat.id)]:
+        config_dict[my_id]['REQUEST_COUNT'][str(message.chat.id)].append(from_user.id)
         await sync()
 
     await send_msg(client , from_user.id)
@@ -47,7 +82,11 @@ async def set_msg(client , message):
     reply = message.reply_to_message
 
     if not (reply and (reply.text or reply.photo)):
-        return await message.reply_text("<b>Reply To Any Text Or Photo Message To Set As Join Message !</b>")
+        try:
+            return await message.reply_text("<b>Reply To Any Text Or Photo Message To Set As Join Message !</b>")
+        except FloodWait as e:
+            await asyncio.sleep(e.value * 1.2)
+            return await message.reply_text("<b>Reply To Any Text Or Photo Message To Set As Join Message !</b>")
     
     html_msg = (reply.text or reply.caption).html
 
@@ -63,9 +102,54 @@ async def set_msg(client , message):
     else:
         config_dict[my_id]['BUTTON'] = None
 
-    await message.reply_text(f'''<b>Join Message Set Successfully !</b>''')
+    try:
+        await message.reply_text(f'''<b>Join Message Set Successfully !</b>''')
+    except FloodWait as e:
+        await asyncio.sleep(e.value * 1.2)
+        return await message.reply_text(f'''<b>Join Message Set Successfully !</b>''')
 
     await sync()
+
+@Client.on_message(filters.command('get_link'))
+async def get_link(client , message):
+
+    my_id = str(client.me.id)
+
+    if message.from_user.id not in config_dict[my_id]['ADMINS'] + OWNER:
+        message.continue_propagation()
+    
+    try:
+        text = int(message.text.split(maxsplit = 1)[1])
+    except IndexError:
+        try:
+            return await message.reply_text("<b>Provide Channel ID With Command To Get Request Link !</b>")
+        except FloodWait as e:
+            await asyncio.sleep(e.value * 1.2)
+            return await message.reply_text("<b>Provide Channel ID With Command To Get Request Link !</b>")
+    
+    try:
+        link = await client.create_chat_invite_link(
+            chat_id = text,
+            creates_join_request = True
+        )
+    except:
+        try:
+            return await message.reply_text("<b>Unable To Create Join Request Link , Make Sure I Have Rights!</b>")
+        except FloodWait as e:
+            await asyncio.sleep(e.value * 1.2)
+            return await message.reply_text("<b>Unable To Create Join Request Link , Make Sure I Have Rights !</b>")
+    
+    link = link.invite_link
+
+    config_dict[my_id]['REQUEST_LINK'][str(text)] = link
+
+    await sync()
+
+    try:
+        await message.reply_text(f"<b>Join Request Link Created Successfully !\n\nLink : {link}</b>")
+    except FloodWait as e:
+        await asyncio.sleep(e.value * 1.2)
+        return await message.reply_text(f"<b>Join Request Link Created Successfully !\n\nLink : {link}</b>")
 
 @Client.on_message(filters.command('get_msg'))
 async def get_msg(client , message):
@@ -78,9 +162,17 @@ async def get_msg(client , message):
     msg = config_dict[my_id]['MSG']
 
     if not msg:
-        return await message.reply_text("<b>No Join Message Set !</b>")
+        try:
+            return await message.reply_text("<b>No Join Message Set !</b>")
+        except FloodWait as e:
+            await asyncio.sleep(e.value * 1.2)
+            return await message.reply_text("<b>No Join Message Set !</b>")
     
-    await message.reply_text(f"<b>Below Is The Current Message -</b>")
+    try:
+        await message.reply_text(f"<b>Below Is The Current Message -</b>")
+    except FloodWait as e:
+        await asyncio.sleep(e.value * 1.2)
+        return await message.reply_text(f"<b>Below Is The Current Message -</b>")
     await send_msg(client , message.from_user.id)
 
 @Client.on_message(filters.command('total_users'))
@@ -94,9 +186,17 @@ async def total_users(client , message):
     total = config_dict[my_id]['USERS']
 
     if not total:
-        return await message.reply_text("<b>No Users Found !</b>")
+        try:
+            return await message.reply_text("<b>No Users Found !</b>")
+        except FloodWait as e:
+            await asyncio.sleep(e.value * 1.2)
+            return await message.reply_text("<b>No Users Found !</b>")
     
-    await message.reply_text(f"<b>Total Users - {len(total)}</b>")
+    try:
+        await message.reply_text(f"<b>Total Users - {len(total)}</b>")
+    except FloodWait as e:
+        await asyncio.sleep(e.value * 1.2)
+        return await message.reply_text(f"<b>Total Users - {len(total)}</b>")
 
 @Client.on_message(filters.command('addadmin') & filters.private & filters.user(OWNER))
 async def add_admin(client , message):
@@ -106,16 +206,28 @@ async def add_admin(client , message):
     try:
         user_id = int(message.text.split()[1])
     except IndexError:
-        return await message.reply_text("<b>Provide User ID To Add As Admin !</b>")
+        try:
+            return await message.reply_text("<b>Provide User ID To Add As Admin !</b>")
+        except FloodWait as e:
+            await asyncio.sleep(e.value * 1.2)
+            return await message.reply_text("<b>Provide User ID To Add As Admin !</b>")
     
     if user_id in config_dict[my_id]['ADMINS']:
-        return await message.reply_text("<b>This User Is Already An Admin !</b>")
+        try:
+            return await message.reply_text("<b>This User Is Already An Admin !</b>")
+        except FloodWait as e:
+            await asyncio.sleep(e.value * 1.2)
+            return await message.reply_text("<b>This User Is Already An Admin !</b>")
     
     config_dict[my_id]['ADMINS'].append(user_id)
 
     await sync()
 
-    await message.reply_text(f"<b>User ID {user_id} Added As Admin !</b>")
+    try:
+        await message.reply_text(f"<b>User ID {user_id} Added As Admin !</b>")
+    except FloodWait as e:
+        await asyncio.sleep(e.value * 1.2)
+        return await message.reply_text(f"<b>User ID {user_id} Added As Admin !</b>")
 
 @Client.on_message(filters.command('removeadmin') & filters.private & filters.user(OWNER))
 async def remove_admin(client , message):
@@ -125,16 +237,28 @@ async def remove_admin(client , message):
     try:
         user_id = int(message.text.split()[1])
     except IndexError:
-        return await message.reply_text("<b>Provide User ID To Remove From Admins !</b>")
+        try:
+            return await message.reply_text("<b>Provide User ID To Remove From Admins !</b>")
+        except FloodWait as e:
+            await asyncio.sleep(e.value * 1.2)
+            return await message.reply_text("<b>Provide User ID To Remove From Admins !</b>")
     
     if user_id not in config_dict[my_id]['ADMINS']:
-        return await message.reply_text("<b>This User Is Not An Admin !</b>")
+        try:
+            return await message.reply_text("<b>This User Is Not An Admin !</b>")
+        except FloodWait as e:
+            await asyncio.sleep(e.value * 1.2)
+            return await message.reply_text("<b>This User Is Not An Admin !</b>")
     
     config_dict[my_id]['ADMINS'].remove(user_id)
 
     await sync()
 
-    await message.reply_text(f"<b>User ID {user_id} Removed From Admins !</b>")
+    try:
+        await message.reply_text(f"<b>User ID {user_id} Removed From Admins !</b>")
+    except FloodWait as e:
+        await asyncio.sleep(e.value * 1.2)
+        return await message.reply_text(f"<b>User ID {user_id} Removed From Admins !</b>")
 
 @Client.on_message(filters.command('listadmins') & filters.private & filters.user(OWNER))
 async def list_admins(client , message):
@@ -143,11 +267,101 @@ async def list_admins(client , message):
     admins = config_dict[my_id]['ADMINS']
 
     if not admins:
-        return await message.reply_text("<b>No Admins Found !</b>")
+        try:
+            return await message.reply_text("<b>No Admins Found !</b>")
+        except FloodWait as e:
+            await asyncio.sleep(e.value * 1.2)
+            return await message.reply_text("<b>No Admins Found !</b>")
     
     admin_list = "\n".join([f"<code>{admin}</code>" for admin in admins])
 
-    await message.reply_text(f"<b>Admins -\n{admin_list}</b>")
+    try:
+        await message.reply_text(f"<b>Admins -\n{admin_list}</b>")
+    except FloodWait as e:
+        await asyncio.sleep(e.value * 1.2)
+        return await message.reply_text(f"<b>Admins -\n{admin_list}</b>")
+
+@Client.on_message(filters.command('auto_delete') & filters.private)
+async def auto_delete(client , message):
+
+    my_id = str(client.me.id)
+
+    if message.from_user.id not in config_dict[my_id]['ADMINS'] + OWNER:
+        message.continue_propagation()
+
+    try:
+        time = int(message.text.split()[1])
+    except IndexError:
+        current_auto_delete = config_dict[my_id]['AUTO_DELETE']
+        if not current_auto_delete:
+            text = "<b>Provide Time In Seconds To Set Auto Delete !</b>"
+        else:
+            text = f"<b>Auto Delete Time Is Currently Set To {current_auto_delete} Seconds !</b>"
+        try:
+            return await message.reply_text(text)
+        except FloodWait as e:
+            await asyncio.sleep(e.value * 1.2)
+            return await message.reply_text(text)
+    
+    config_dict[my_id]['AUTO_DELETE'] = time
+
+    await sync()
+
+    try:
+        await message.reply_text(f"<b>Auto Delete Time Set To {time} Seconds !</b>")
+    except FloodWait as e:
+        await asyncio.sleep(e.value * 1.2)
+        return await message.reply_text(f"<b>Auto Delete Time Set To {time} Seconds !</b>")
+
+@Client.on_message(filters.command('protect') & filters.private)
+async def protect(client , message):
+    my_id = str(client.me.id)
+
+    if message.from_user.id not in config_dict[my_id]['ADMINS'] + OWNER:
+        message.continue_propagation()
+
+    if config_dict[my_id]['PROTECT_CONTENT']:
+        config_dict[my_id]['PROTECT_CONTENT'] = False
+        text = "<b>Protect Content Disabled !</b>"
+    else:
+        config_dict[my_id]['PROTECT_CONTENT'] = True
+        text = "<b>Protect Content Enabled !</b>"
+    
+    await sync()
+
+    try:
+        await message.reply_text(text)
+    except FloodWait as e:
+        await asyncio.sleep(e.value * 1.2)
+        return await message.reply_text(text)
+
+@Client.on_message(filters.command('request_count') & filters.private)
+async def request_count(client , message):
+
+    my_id = str(client.me.id)
+
+    if message.from_user.id not in config_dict[my_id]['ADMINS'] + OWNER:
+        message.continue_propagation()
+    
+    request_count = config_dict[my_id]['REQUEST_COUNT']
+
+    if not request_count:
+        try:
+            return await message.reply_text("<b>No Request Count Found !</b>")
+        except FloodWait as e:
+            await asyncio.sleep(e.value * 1.2)
+            return await message.reply_text("<b>No Request Count Found !</b>")
+    
+    string = "<b>Request Counts -</b>\n\n"
+
+    for chat_id , user_ids in request_count.items():
+        string += f"<b>• {chat_id} - {len(user_ids)}</b>\n"
+    
+    try:
+        await message.reply_text(string)
+    except FloodWait as e:
+        await asyncio.sleep(e.value * 1.2)
+        return await message.reply_text(string)
 
 async def convertTime(s: int) -> str:
     m, s = divmod(int(s), 60)
@@ -172,7 +386,11 @@ async def on_broadcast(client , message):
     reply = message.reply_to_message
 
     if not reply:
-         return await message.reply_text("<b>Reply To Any Message To Broadcast !</b>" , quote=True)
+        try:
+            return await message.reply_text("<b>Reply To Any Message To Broadcast !</b>" , quote=True)
+        except FloodWait as e:
+            await asyncio.sleep(e.value * 1.2)
+            return await message.reply_text("<b>Reply To Any Message To Broadcast !</b>" , quote=True)
 
     query = config_dict[my_id]['USERS']
 
@@ -184,7 +402,11 @@ async def on_broadcast(client , message):
 
     start_time = int(time.time())
 
-    prog = await message.reply_text("<b>Broadcasting Message, Please Wait...</b>" , quote=True)
+    try:
+        prog = await message.reply_text("<b>Broadcasting Message, Please Wait...</b>" , quote=True)
+    except FloodWait as e:
+        await asyncio.sleep(e.value * 1.2)
+        return await message.reply_text("<b>Broadcasting Message, Please Wait...</b>" , quote=True)
 
     status_msg = """<b><u>Broadcast {status}</u>
 
@@ -238,7 +460,11 @@ async def on_broadcast(client , message):
                 unsuccessful = unsuccessful
             )
 
-            await prog.edit(status)
+            try:
+                await prog.edit(status)
+            except FloodWait as e:
+                await asyncio.sleep(e.value * 1.2)
+                await prog.edit(status)
 
             await asyncio.sleep(1)
     
@@ -252,7 +478,11 @@ async def on_broadcast(client , message):
         deleted = deleted,
         unsuccessful = unsuccessful
     )
-    await prog.edit(status)
+    try:
+        await prog.edit(status)
+    except FloodWait as e:
+        await asyncio.sleep(e.value * 1.2)
+        await prog.edit(status)
 
 @Client.on_message(filters.private)
 async def on_other_messages(client , message):

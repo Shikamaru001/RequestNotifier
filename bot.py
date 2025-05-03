@@ -32,6 +32,10 @@ for bot_id in config_dict:
             BotCommand("set_msg", "Set Message To Send On Join (Admins Only)"),
             BotCommand("get_msg", "Get Current Join Message (Admins Only)"),
             BotCommand("total_users", "Get Total Users (Admins Only)"),
+            BotCommand("get_link", "Get Request Link (Admins Only)"),
+            BotCommand("request_count", "Get Request Count For All Channels (Admins Only)"),
+            BotCommand("auto_delete", "Set Auto Delete Time (Admins Only)"),
+            BotCommand("protect", "Protect Content (Admins Only)"),
             BotCommand("broadcast", "Broadcast To All Users (Admins Only)"),
             BotCommand("addadmin", "Add Admin (Owner Only)"),
             BotCommand("removeadmin", "Remove Admin (Owner Only)"),
@@ -44,8 +48,11 @@ for bot_id in config_dict:
 
         temp.me = me
 
-        if 'NAME' not in config_dict[bot_id]:
+        if not config_dict[bot_id]['NAME']:
             config_dict[bot_id]['NAME'] = me.first_name
+        
+        if not config_dict[bot_id]['BOT_USERNAME']:
+            config_dict[bot_id]['BOT_USERNAME'] = me.username
 
         LOGGER(__name__).info(f"{me.first_name} ({me.id}) Started Successfully !")
     except:
@@ -56,21 +63,27 @@ async def restart(done):
         f.write(f"{done.chat.id}\n{done.id}\n")
     os.execl(sys.executable, sys.executable, '-B' , "bot.py")
 
-@master.on_message(filters.command('start') & filters.private & filters.user(OWNER))
+@master.on_message(filters.command('start') & filters.private)
 async def start(client, message):
-    await message.reply_text("<b>Hello! I am a master bot that manages other bots.</b>")
+    await message.reply_text("<b>Hello! I Am Master Bot That Manages Other Bots !</b>")
 
 @master.on_message(filters.command('addbot') & filters.private & filters.user(OWNER))
 async def add_bot(client, message):
     try:
         bot_token = message.text.split()[1]
     except IndexError:
-        return await message.reply_text("<b>Please provide a bot token.</b>")
+        return await message.reply_text("<b>Please Provide Bot Token With Command .\n\nSyntax : <code>/addbot bot_token</code></b>")
     
     bot_id = bot_token.split(":")[0]
     
     config_dict[bot_id] = {
         'BOT_TOKEN': bot_token,
+        'BOT_USERNAME' : None,
+        'NAME' : None,
+        'REQUEST_LINK' : {},
+        'REQUEST_COUNT' : {},
+        'PROTECT_CONTENT': False ,
+        'AUTO_DELETE' : 0,
         'MSG': None,
         'PHOTO' : None ,
         'BUTTON' : None ,
@@ -89,10 +102,10 @@ async def remove_bot(client, message):
     try:
         bot_id = message.text.split()[1]
     except IndexError:
-        return await message.reply_text("<b>Please provide a bot ID.</b>")
+        return await message.reply_text("<b>Please Provide Bot ID With Command.\n\nSyntax : <code>/removebot bot_id</code></b>")
     
     if bot_id not in config_dict:
-        return await message.reply_text("<b>Bot ID not found.</b>")
+        return await message.reply_text("<b>Bot Not Added.</b>")
     
     del config_dict[bot_id]
 
@@ -112,9 +125,8 @@ async def list_bots(client, message):
     string = "<b>List of Bots:</b>\n\n"
 
     for bot_id in copy:
-        string += f"<b>Bot ID:</b> {bot_id}\n"
-        string += f"<b>Bot Token:</b> {copy[bot_id]['BOT_TOKEN']}\n"
-        string += f"<b>Bot Name:</b> {copy[bot_id].get('NAME', 'N/A')}\n\n"
+        string += f"<b>Bot : [{copy[bot_id]['NAME']}](t.me/{copy[bot_id]['BOT_USERNAME']})\n"
+        string += f"<b>Bot Token:</b> <code>{copy[bot_id]['BOT_TOKEN']}</code>\n\n"
     string += "<b>Use /removebot <bot_id> to remove a bot.</b>"
 
     await message.reply_text(string)
@@ -138,6 +150,7 @@ async def restart_edit():
 
 async def set_commands():
     bot_cmds = [
+        BotCommand("start", "Start the bot"),
         BotCommand("addbot", "Add a new bot (Owner only)"),
         BotCommand("removebot", "Remove an existing bot (Owner only)"),
         BotCommand("listbots", "List all bots (Owner only)"),
