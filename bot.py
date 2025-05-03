@@ -131,6 +131,15 @@ async def list_bots(client, message):
 
     await message.reply_text(string)
 
+@master.on_message(filters.command('restart') & filters.private & filters.user(OWNER))
+async def restart_(client, message):
+    msg = await message.reply_text('<b><i>Now Restarting All Bots!</i></b>' , True)
+    with open(".restartmsg", "w") as f:
+        f.write(f"{msg.chat.id}\n{msg.id}\n")
+    proc = await asyncio.create_subprocess_exec("python3", "update.py")
+    await asyncio.gather(proc.wait())
+    os.execl(sys.executable, sys.executable, '-B' , "bot.py")
+
 async def restart_edit():
     if not os.path.exists(".restartmsg"):
         return
@@ -154,6 +163,7 @@ async def set_commands():
         BotCommand("addbot", "Add a new bot (Owner only)"),
         BotCommand("removebot", "Remove an existing bot (Owner only)"),
         BotCommand("listbots", "List all bots (Owner only)"),
+        BotCommand("restart", "Restart all bots (Owner only)"),
     ]
     await master.set_bot_commands(bot_cmds)
 
