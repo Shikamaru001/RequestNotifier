@@ -120,7 +120,7 @@ async def list_bots(client, message):
     copy = config_dict.copy()
     del copy["_id"]
     if not copy:
-        return await message.reply_text("<b>No bots found.</b>")
+        return await message.reply_text("<b>No bots foundd.</b>")
     
     string = "<b>List of Bots:</b>\n\n"
 
