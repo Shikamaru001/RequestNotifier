@@ -20,27 +20,32 @@ async def delete_task(messages , time):
 
 async def send_msg(client , chat_id):
 
-    msg = config_dict[str(client.me.id)]['MSG']
-    photo = config_dict[str(client.me.id)]['PHOTO']
-    button = config_dict[str(client.me.id)]['BUTTON']
+    msg_ =  [config_dict[str(client.me.id)].get(f"MSG{i}", None) for i in range(1, 6)]
+    photo_ =  [config_dict[str(client.me.id)].get(f"PHOTO{i}", None) for i in range(1, 6)]
+    button_ =  [config_dict[str(client.me.id)].get(f"BUTTON{i}", None) for i in range(1, 6)]
     auto_delete = config_dict[str(client.me.id)]['AUTO_DELETE']
     protect = config_dict[str(client.me.id)]['PROTECT_CONTENT']
 
-    if not msg: return False
+    for msg , photo , button in zip(msg_ , photo_ , button_):
 
-    reply_markup = None if not button else ikb(button)
+        if not msg: continue
 
-    try:
-        if not photo:
-            done = await client.send_message(chat_id , msg , reply_markup=reply_markup , protect_content = protect)
-        else:
-            done = await client.send_photo(chat_id , photo , caption=msg , reply_markup=reply_markup , protect_content = protect)
-        if auto_delete:
-            asyncio.create_task(delete_task([done] , auto_delete))
-    except FloodWait as e:
-        await asyncio.sleep(e.value * 1.2)
-        return await send_msg(client , chat_id)
-    return True
+        reply_markup = None if not button else ikb(button)
+
+        try:
+            if not photo:
+                done = await client.send_message(chat_id , msg , reply_markup=reply_markup , protect_content = protect)
+            else:
+                done = await client.send_photo(chat_id , photo , caption=msg , reply_markup=reply_markup , protect_content = protect)
+            if auto_delete:
+                asyncio.create_task(delete_task([done] , auto_delete))
+        except FloodWait as e:
+            if not photo:
+                done = await client.send_message(chat_id , msg , reply_markup=reply_markup , protect_content = protect)
+            else:
+                done = await client.send_photo(chat_id , photo , caption=msg , reply_markup=reply_markup , protect_content = protect)
+            if auto_delete:
+                asyncio.create_task(delete_task([done] , auto_delete))
 
 @Client.on_chat_join_request()
 async def on_chat_join(client , message):
@@ -71,7 +76,7 @@ async def on_chat_join(client , message):
 
     await send_msg(client , from_user.id)
 
-@Client.on_message(filters.command('set_msg'))
+@Client.on_message(filters.create(lambda _,__,msg: msg.text and msg.text.startswith('/set_msg')))
 async def set_msg(client , message):
 
     my_id = str(client.me.id)
@@ -81,32 +86,66 @@ async def set_msg(client , message):
 
     reply = message.reply_to_message
 
-    if not (reply and (reply.text or reply.photo)):
+    if not (reply and (reply.text or reply.photo) ) and ('delete' not in message.text or ''):
         try:
             return await message.reply_text("<b>Reply To Any Text Or Photo Message To Set As Join Message !</b>")
         except FloodWait as e:
             await asyncio.sleep(e.value * 1.2)
             return await message.reply_text("<b>Reply To Any Text Or Photo Message To Set As Join Message !</b>")
+
+    splitted = message.text.split(maxsplit=1)
+
+    index = splitted[0]
+
+    if index == "/set_msg":
+        index = "1"
+    elif index == "/set_msg1":
+        index = "1"
+    else:
+        try:
+            index = int(index[-1])
+            if index > 5:
+                raise Exception()
+            index = str(index)
+        except:
+            try:
+                return await message.reply_text("<b>Use proper syntax like , /set_msg , /set_msg2 and upto /set_msg5 !</b>")
+            except FloodWait as e:
+                await asyncio.sleep(e.value * 1.2)
+                return await message.reply_text("<b>Use proper syntax like , /set_msg , /set_msg2 and upto /set_msg5 !</b>")
     
+    if len(splitted) > 1 and splitted[1].strip() == 'delete':
+        try:
+            del config_dict[my_id][f'MSG{index}']
+            del config_dict[my_id][f'PHOTO{index}']
+            del config_dict[my_id][f'BUTTON{index}']
+        except:
+            pass
+        try:
+            return await message.reply_text(f"<b>Message {index} Cleared !</b>")
+        except FloodWait as e:
+            await asyncio.sleep(e.value * 1.2)
+            return await message.reply_text(f"<b>Message {index} Cleared !</b>")
+
     html_msg = (reply.text or reply.caption).html
 
-    config_dict[my_id]['MSG'] = html_msg
+    config_dict[my_id][f'MSG{index}'] = html_msg
 
     if reply.photo:
-        config_dict[my_id]['PHOTO'] = reply.photo.file_id
+        config_dict[my_id][f'PHOTO{index}'] = reply.photo.file_id
     else:
-        config_dict[my_id]['PHOTO'] = None
+        config_dict[my_id][f'PHOTO{index}'] = None
     
     if reply.reply_markup:
-        config_dict[my_id]['BUTTON'] = bki(reply.reply_markup)
+        config_dict[my_id][f'BUTTON{index}'] = bki(reply.reply_markup)
     else:
-        config_dict[my_id]['BUTTON'] = None
+        config_dict[my_id][f'BUTTON{index}'] = None
 
     try:
-        await message.reply_text(f'''<b>Join Message Set Successfully !</b>''')
+        await message.reply_text(f'''<b>Join Message {index} Set Successfully !</b>''')
     except FloodWait as e:
         await asyncio.sleep(e.value * 1.2)
-        return await message.reply_text(f'''<b>Join Message Set Successfully !</b>''')
+        return await message.reply_text(f'''<b>Join Message {index} Set Successfully !</b>''')
 
     await sync()
 
@@ -159,9 +198,9 @@ async def get_msg(client , message):
     if message.from_user.id not in config_dict[my_id]['ADMINS'] + OWNER:
         message.continue_propagation()
 
-    msg = config_dict[my_id]['MSG']
+    msg_ =  [config_dict[str(client.me.id)].get(f"MSG{i}", None) for i in range(1, 6)]
 
-    if not msg:
+    if not any(msg_):
         try:
             return await message.reply_text("<b>No Join Message Set !</b>")
         except FloodWait as e:
