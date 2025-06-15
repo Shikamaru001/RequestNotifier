@@ -12,10 +12,10 @@ jobs:
           curl https://cli-assets.heroku.com/install.sh | sh 
       - uses: akhileshns/heroku-deploy@v3.14.15
         with:
-          heroku_api_key: HRKU-2de3ca33-0b2a-4a73-bafb-eaeb2b5d6013
-          heroku_app_name: aaaommm
-          heroku_email: satyamsingh435466@gmail.com
-          team: evofox243
+          heroku_api_key: HRKU-AAulL0IqjemAavaIfjhRSIo90Vpou0RNqkfQBJh7Si2g_____whH9f9uNFiQ
+          heroku_app_name: aaaommmm
+          heroku_email: VikramSingh926339@outlook.com
+          team: vastusastrasam92379
           usedocker: true
           docker_heroku_process_type: worker
           stack: "container"
