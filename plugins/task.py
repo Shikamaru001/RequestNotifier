@@ -1,6 +1,6 @@
 from pyrogram import Client, filters
 from db import config_dict, sync
-from config import OWNER
+from config import OWNER , LOGGER
 from pyrogram.errors import FloodWait, UserIsBlocked, InputUserDeactivated
 import time , asyncio
 from pyrogram.helpers import ikb , bki
@@ -435,8 +435,6 @@ async def on_broadcast(client , message):
 
     broadcast_msg = reply
 
-    broadcast_reply_markup = reply.reply_markup
-
     total , successful , blocked , deleted , unsuccessful = 0 , 0 , 0 , 0 , 0
 
     start_time = int(time.time())
@@ -460,28 +458,23 @@ async def on_broadcast(client , message):
     for user_id in query:
 
         try:
-            await broadcast_msg.copy(chat_id=user_id , reply_markup=broadcast_reply_markup)
+            await broadcast_msg.copy(chat_id=user_id)
             successful += 1
         
         except FloodWait as e:
             await asyncio.sleep(e.value * 1.5)
-            await broadcast_msg.copy(chat_id=user_id , reply_markup=broadcast_reply_markup)
+            await broadcast_msg.copy(chat_id=user_id)
             successful += 1
         
         except UserIsBlocked:
-            if user_id in config_dict[my_id]['USERS']:
-                config_dict[my_id]['USERS'].remove(user_id)
-                await sync()
             blocked += 1
         
         except InputUserDeactivated:
-            if user_id in config_dict[my_id]['USERS']:
-                config_dict[my_id]['USERS'].remove(user_id)
-                await sync()
             deleted += 1
         
         except Exception as e:
             unsuccessful += 1
+            LOGGER(__name__).info(f"ERROR Sending To User - {user_id} - {str(e)}")
         
         total += 1
 

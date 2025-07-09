@@ -140,6 +140,11 @@ async def restart_(client, message):
     await asyncio.gather(proc.wait())
     os.execl(sys.executable, sys.executable, '-B' , "bot.py")
 
+@master.on_message(filters.command('log') & filters.private & filters.user(OWNER))
+async def log(client, message):
+
+    await message.reply_document('log.txt', caption='<b>LOG File</b>' , quote =True)
+
 async def restart_edit():
     if not os.path.exists(".restartmsg"):
         return
