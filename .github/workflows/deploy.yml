@@ -12,10 +12,10 @@ jobs:
           curl https://cli-assets.heroku.com/install.sh | sh 
       - uses: akhileshns/heroku-deploy@v3.14.15
         with:
-          heroku_api_key: HRKU-AAm07SlD1usWV_8rYNMO8du5vMHwPARJa30FBL2hHMUg_____wuW6GvyQ1o7
-          heroku_app_name: zoromasterbota
-          heroku_email: ManishRoy34656@outlook.com
-          team: manish43646
+          heroku_api_key: HRKU-AA7aQSOXasj2SqIzCLsXNJfV2r0o-RQ0OQlfUPkQyJGg_____wLlXDgBTIXR
+          heroku_app_name: zmasterbota
+          heroku_email: KajalSingh927439@hotmail.com
+          team: kajal4654367
           usedocker: true
           docker_heroku_process_type: worker
           stack: "container"
