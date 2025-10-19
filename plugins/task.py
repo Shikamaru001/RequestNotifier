@@ -1,5 +1,5 @@
 from pyrogram import Client, filters
-from db import config_dict, sync
+from db import config_dict, save_settings, add_user, user_exists, count_users, iter_user_ids
 from config import OWNER , LOGGER
 from pyrogram.errors import FloodWait, UserIsBlocked, InputUserDeactivated
 import time , asyncio
@@ -40,6 +40,7 @@ async def send_msg(client , chat_id):
             if auto_delete:
                 asyncio.create_task(delete_task([done] , auto_delete))
         except FloodWait as e:
+            await asyncio.sleep(e.value * 1.2)
             if not photo:
                 done = await client.send_message(chat_id , msg , reply_markup=reply_markup , protect_content = protect)
             else:
@@ -66,13 +67,12 @@ async def on_chat_join(client , message):
 
     if not from_user: return
 
-    if from_user.id not in config_dict[my_id]['USERS']:
-        config_dict[my_id]['USERS'].append(from_user.id)
-        await sync()
+    if not await user_exists(my_id, from_user.id):
+        await add_user(my_id, from_user.id)
     
     if from_user.id not in config_dict[my_id]['REQUEST_COUNT'][str(message.chat.id)]:
         config_dict[my_id]['REQUEST_COUNT'][str(message.chat.id)].append(from_user.id)
-        await sync()
+        await save_settings(my_id)
 
     await send_msg(client , from_user.id)
 
@@ -147,7 +147,7 @@ async def set_msg(client , message):
         await asyncio.sleep(e.value * 1.2)
         return await message.reply_text(f'''<b>Join Message {index} Set Successfully !</b>''')
 
-    await sync()
+    await save_settings(my_id)
 
 @Client.on_message(filters.command('get_link'))
 async def get_link(client , message):
@@ -182,7 +182,7 @@ async def get_link(client , message):
 
     config_dict[my_id]['REQUEST_LINK'][str(text)] = link
 
-    await sync()
+    await save_settings(my_id)
 
     try:
         await message.reply_text(f"<b>Join Request Link Created Successfully !\n\nLink : {link}</b>")
@@ -222,7 +222,7 @@ async def total_users(client , message):
     if message.from_user.id not in config_dict[my_id]['ADMINS'] + OWNER:
         message.continue_propagation()
 
-    total = config_dict[my_id]['USERS']
+    total = await count_users(my_id)
 
     if not total:
         try:
@@ -232,10 +232,10 @@ async def total_users(client , message):
             return await message.reply_text("<b>No Users Found !</b>")
     
     try:
-        await message.reply_text(f"<b>Total Users - {len(total)}</b>")
+        await message.reply_text(f"<b>Total Users - {total}</b>")
     except FloodWait as e:
         await asyncio.sleep(e.value * 1.2)
-        return await message.reply_text(f"<b>Total Users - {len(total)}</b>")
+        return await message.reply_text(f"<b>Total Users - {total}</b>")
 
 @Client.on_message(filters.command('addadmin') & filters.private & filters.user(OWNER))
 async def add_admin(client , message):
@@ -260,7 +260,7 @@ async def add_admin(client , message):
     
     config_dict[my_id]['ADMINS'].append(user_id)
 
-    await sync()
+    await save_settings(my_id)
 
     try:
         await message.reply_text(f"<b>User ID {user_id} Added As Admin !</b>")
@@ -291,7 +291,7 @@ async def remove_admin(client , message):
     
     config_dict[my_id]['ADMINS'].remove(user_id)
 
-    await sync()
+    await save_settings(my_id)
 
     try:
         await message.reply_text(f"<b>User ID {user_id} Removed From Admins !</b>")
@@ -344,7 +344,7 @@ async def auto_delete(client , message):
     
     config_dict[my_id]['AUTO_DELETE'] = time
 
-    await sync()
+    await save_settings(my_id)
 
     try:
         await message.reply_text(f"<b>Auto Delete Time Set To {time} Seconds !</b>")
@@ -366,7 +366,7 @@ async def protect(client , message):
         config_dict[my_id]['PROTECT_CONTENT'] = True
         text = "<b>Protect Content Enabled !</b>"
     
-    await sync()
+    await save_settings(my_id)
 
     try:
         await message.reply_text(text)
@@ -431,7 +431,7 @@ async def on_broadcast(client , message):
             await asyncio.sleep(e.value * 1.2)
             return await message.reply_text("<b>Reply To Any Message To Broadcast !</b>" , quote=True)
 
-    query = config_dict[my_id]['USERS']
+    query = iter_user_ids(my_id)
 
     broadcast_msg = reply
 
@@ -455,7 +455,7 @@ async def on_broadcast(client , message):
 - Deleted Accounts: <code>{deleted}</code>
 - Unsuccessful: <code>{unsuccessful}</code></b>"""
 
-    for user_id in query:
+    async for user_id in query:
 
         try:
             await broadcast_msg.copy(chat_id=user_id)
@@ -523,8 +523,7 @@ async def on_other_messages(client , message):
 
     if not message.from_user: return
 
-    if message.from_user.id not in config_dict[my_id]['USERS']:
-        config_dict[my_id]['USERS'].append(message.from_user.id)
-        await sync()
+    if not await user_exists(my_id, message.from_user.id):
+        await add_user(my_id, message.from_user.id)
     
     await send_msg(client , message.from_user.id)
