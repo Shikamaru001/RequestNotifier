@@ -1,6 +1,6 @@
 from pyrogram import Client, filters, idle
 from config import API_ID, API_HASH, BOT_TOKEN, LOGGER, OWNER
-from db import config_dict, load_all_settings, save_settings, create_bot, delete_bot, add_user, user_exists, count_users
+from db import config_dict, load_all_settings, save_settings, create_bot, delete_bot, add_user, user_exists, count_users, ping_db
 import os, sys, asyncio
 from pyrogram.types import BotCommand
 from pyrogram.errors import FloodWait
@@ -11,10 +11,24 @@ workers = {}
 loop = asyncio.get_event_loop()
 
 async def start_worker_bots():
+    LOGGER(__name__).info("start_worker_bots: loading settings from DB")
     await load_all_settings()
-    for bot_id in list(config_dict.keys()):
-        bot_token = config_dict[bot_id]['BOT_TOKEN']
+    print(config_dict.keys())
+    LOGGER(__name__).info(f"config_dict after load: keys={list(config_dict.keys())} len={len(config_dict)}")
+    try:
+        metas = await __import__('db').db.get_bots_meta()
+    except Exception:
         try:
+            from db import get_bots_meta
+            metas = await get_bots_meta()
+        except Exception:
+            metas = None
+    LOGGER(__name__).info(f"bots meta: {metas}")
+    for bot_id in list(config_dict.keys()):
+        bot_token = config_dict[bot_id].get('BOT_TOKEN')
+        LOGGER(__name__).info(f"starting worker for bot_id={bot_id} bot_token_present={bool(bot_token)}")
+        try:
+            LOGGER(__name__).info(f"starting worker for bot_id={bot_id} token_mask={str(bot_token)[:10]}...")
             temp = Client(
                 str(bot_id),
                 api_id=API_ID,
@@ -51,8 +65,8 @@ async def start_worker_bots():
                 config_dict[bot_id]['BOT_USERNAME'] = me.username
             await save_settings(bot_id)
             LOGGER(__name__).info(f"{me.first_name} ({me.id}) Started Successfully !")
-        except Exception:
-            LOGGER(__name__).error(f"Failed To Start Bot - {bot_token}")
+        except Exception as e:
+            LOGGER(__name__).exception(f"Failed To Start Bot - bot_id={bot_id} token_mask={str(bot_token)[:10]}: {e}")
 
 async def restart(done):
     with open(".restartmsg", "w") as f:
@@ -83,6 +97,7 @@ async def add_bot(client, message):
     }
     await create_bot(bot_id, settings)
     config_dict[bot_id] = settings
+    LOGGER(__name__).info(f"add_bot: created bot {bot_id} in DB")
 
     try:
         done = await message.reply_text(f"<b>Bot with ID {bot_id} added successfully! Starting now...</b>")
@@ -131,6 +146,7 @@ async def add_bot(client, message):
             await asyncio.sleep(e.value * 1.2)
             await done.edit(f"<b>Bot {me.first_name} ({me.id}) started successfully.</b>")
     except Exception as e:
+        LOGGER(__name__).exception(f"add_bot: failed to start worker for bot_id={bot_id}: {e}")
         try:
             await done.edit("<b>Failed to start the bot, check token and logs.</b>")
         except Exception:
@@ -146,6 +162,7 @@ async def remove_bot(client, message):
     if bot_id not in config_dict:
         return await message.reply_text("<b>Bot Not Added.</b>")
     await delete_bot(bot_id)
+    LOGGER(__name__).info(f"remove_bot: deleted bot {bot_id} from DB")
 
     done = await message.reply_text(f"<b>Bot with ID {bot_id} removed successfully!\n\nNow Restarting All Bots!</b>")
 
@@ -153,10 +170,8 @@ async def remove_bot(client, message):
 
 @master.on_message(filters.command('listbots') & filters.private & filters.user(OWNER))
 async def list_bots(client, message):
+    await load_all_settings()
     copy = config_dict.copy()
-    if not copy:
-        await load_all_settings()
-        copy = config_dict.copy()
     if not copy:
         return await message.reply_text("<b>No bots found.</b>")
     
@@ -174,8 +189,6 @@ async def restart_(client, message):
     msg = await message.reply_text('<b><i>Now Restarting All Bots!</i></b>' , True)
     with open(".restartmsg", "w") as f:
         f.write(f"{msg.chat.id}\n{msg.id}\n")
-    proc = await asyncio.create_subprocess_exec("python3", "update.py")
-    await asyncio.gather(proc.wait())
     os.execl(sys.executable, sys.executable, '-B' , "bot.py")
 
 @master.on_message(filters.command('log') & filters.private & filters.user(OWNER))
@@ -216,8 +229,14 @@ async def set_commands():
 
 async def main():
     await master.start()
+    try:
+        await ping_db()
+    except Exception:
+        await asyncio.sleep(1)
+        await ping_db()
     await start_worker_bots()
     await restart_edit()
+    await load_all_settings()
     await set_commands()
     LOGGER(__name__).info("Master Bot Started Successfully !")
     await idle()

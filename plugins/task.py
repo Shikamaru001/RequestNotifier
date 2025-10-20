@@ -5,6 +5,15 @@ from pyrogram.errors import FloodWait, UserIsBlocked, InputUserDeactivated
 import time , asyncio
 from pyrogram.helpers import ikb , bki
 
+def safe_handler(func):
+    async def wrapper(*args, **kwargs):
+        try:
+            return await func(*args, **kwargs)
+        except Exception as e:
+            LOGGER(__name__).exception(f"Handler {func.__name__} raised: {e}")
+            return
+    return wrapper
+
 async def delete_task(messages , time):
     
     await asyncio.sleep(time)
@@ -41,14 +50,19 @@ async def send_msg(client , chat_id):
                 asyncio.create_task(delete_task([done] , auto_delete))
         except FloodWait as e:
             await asyncio.sleep(e.value * 1.2)
-            if not photo:
-                done = await client.send_message(chat_id , msg , reply_markup=reply_markup , protect_content = protect)
-            else:
-                done = await client.send_photo(chat_id , photo , caption=msg , reply_markup=reply_markup , protect_content = protect)
-            if auto_delete:
-                asyncio.create_task(delete_task([done] , auto_delete))
+            try:
+                if not photo:
+                    done = await client.send_message(chat_id , msg , reply_markup=reply_markup , protect_content = protect)
+                else:
+                    done = await client.send_photo(chat_id , photo , caption=msg , reply_markup=reply_markup , protect_content = protect)
+                if auto_delete:
+                    asyncio.create_task(delete_task([done] , auto_delete))
+            except Exception as err:
+                LOGGER(__name__).exception(f"send_msg retry failed: {err}")
+                pass
 
 @Client.on_chat_join_request()
+@safe_handler
 async def on_chat_join(client , message):
 
     my_id = str(client.me.id)
@@ -77,6 +91,7 @@ async def on_chat_join(client , message):
     await send_msg(client , from_user.id)
 
 @Client.on_message(filters.create(lambda _,__,msg: msg.text and msg.text.startswith('/set_msg')))
+@safe_handler
 async def set_msg(client , message):
 
     my_id = str(client.me.id)
@@ -150,6 +165,7 @@ async def set_msg(client , message):
     await save_settings(my_id)
 
 @Client.on_message(filters.command('get_link'))
+@safe_handler
 async def get_link(client , message):
 
     my_id = str(client.me.id)
@@ -191,6 +207,7 @@ async def get_link(client , message):
         return await message.reply_text(f"<b>Join Request Link Created Successfully !\n\nLink : {link}</b>")
 
 @Client.on_message(filters.command('get_msg'))
+@safe_handler
 async def get_msg(client , message):
 
     my_id = str(client.me.id)
@@ -215,6 +232,7 @@ async def get_msg(client , message):
     await send_msg(client , message.from_user.id)
 
 @Client.on_message(filters.command('total_users'))
+@safe_handler
 async def total_users(client , message):
 
     my_id = str(client.me.id)
@@ -238,6 +256,7 @@ async def total_users(client , message):
         return await message.reply_text(f"<b>Total Users - {total}</b>")
 
 @Client.on_message(filters.command('addadmin') & filters.private & filters.user(OWNER))
+@safe_handler
 async def add_admin(client , message):
 
     my_id = str(client.me.id)
@@ -269,6 +288,7 @@ async def add_admin(client , message):
         return await message.reply_text(f"<b>User ID {user_id} Added As Admin !</b>")
 
 @Client.on_message(filters.command('removeadmin') & filters.private & filters.user(OWNER))
+@safe_handler
 async def remove_admin(client , message):
 
     my_id = str(client.me.id)
@@ -300,6 +320,7 @@ async def remove_admin(client , message):
         return await message.reply_text(f"<b>User ID {user_id} Removed From Admins !</b>")
 
 @Client.on_message(filters.command('listadmins') & filters.private & filters.user(OWNER))
+@safe_handler
 async def list_admins(client , message):
     my_id = str(client.me.id)
 
@@ -321,6 +342,7 @@ async def list_admins(client , message):
         return await message.reply_text(f"<b>Admins -\n{admin_list}</b>")
 
 @Client.on_message(filters.command('auto_delete') & filters.private)
+@safe_handler
 async def auto_delete(client , message):
 
     my_id = str(client.me.id)
@@ -353,6 +375,7 @@ async def auto_delete(client , message):
         return await message.reply_text(f"<b>Auto Delete Time Set To {time} Seconds !</b>")
 
 @Client.on_message(filters.command('protect') & filters.private)
+@safe_handler
 async def protect(client , message):
     my_id = str(client.me.id)
 
@@ -375,6 +398,7 @@ async def protect(client , message):
         return await message.reply_text(text)
 
 @Client.on_message(filters.command('request_count') & filters.private)
+@safe_handler
 async def request_count(client , message):
 
     my_id = str(client.me.id)
@@ -415,6 +439,7 @@ async def convertTime(s: int) -> str:
     return convertedTime[:-2]
 
 @Client.on_message(filters.private & filters.command('broadcast'))
+@safe_handler
 async def on_broadcast(client , message):
 
     my_id = str(client.me.id)
@@ -517,6 +542,7 @@ async def on_broadcast(client , message):
         await prog.edit(status)
 
 @Client.on_message(filters.private)
+@safe_handler
 async def on_other_messages(client , message):
 
     my_id = str(client.me.id)
